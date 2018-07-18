@@ -11,7 +11,9 @@ use src\Integration\DataProvider;
 
 class DecoratorManager extends DataProvider
 {
+    /** @var CacheItemPoolInterface $cache*/
     public $cache;
+    /** @var LoggerInterface|null $logger*/
     public $logger;
 
     /**
@@ -20,26 +22,23 @@ class DecoratorManager extends DataProvider
      * @param string $password
      * @param CacheItemPoolInterface $cache
      */
-    public function __construct($host, $user, $password, CacheItemPoolInterface $cache)
+    public function __construct(string $host, string $user, string $password, CacheItemPoolInterface $cache, LoggerInterface $logger)
     {
         parent::__construct($host, $user, $password);
         $this->cache = $cache;
-    }
-
-    public function setLogger(LoggerInterface $logger)
-    {
         $this->logger = $logger;
     }
 
     /**
-     * {@inheritdoc}
+     * @param array $input
+     * @return array
      */
     public function getResponse(array $input)
     {
         try {
             $cacheKey = $this->getCacheKey($input);
             $cacheItem = $this->cache->getItem($cacheKey);
-            if ($cacheItem->isHit()) {
+                if ($cacheItem->isHit()) {
                 return $cacheItem->get();
             }
 
@@ -51,16 +50,22 @@ class DecoratorManager extends DataProvider
                     (new DateTime())->modify('+1 day')
                 );
 
+            $this->cache->save($cacheItem);
+
             return $result;
         } catch (Exception $e) {
-            $this->logger->critical('Error');
+            $this->logger->critical($e->getMessage(), ['exception' => $e]);
         }
 
         return [];
     }
 
+    /**
+     * @param array $input
+     * @return string
+     */
     public function getCacheKey(array $input)
     {
-        return json_encode($input);
+        return hash('sha512', $input);
     }
 }
